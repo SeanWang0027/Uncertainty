@@ -5,6 +5,24 @@ import json
 from models import LanguageModel
 
 
+PROMPT = """Answer these questions.\n
+            Q: Which American-born Sinclair won the Nobel Prize for Literature in 1930?\n
+            A: Sinclair Lewis\n
+            Q: Where in England was Dame Judi Dench born?\n
+            A: York\n
+            Q: In which decade did Billboard magazine first publish an American hit chart?\n
+            A: 30s\n
+            Q: From which country did Angola achieve independence in 1975?\n
+            A: Portugal\n
+            Q: Which city does David Soul come from?\n
+            A: Chicago\n
+            Q: Who won Super Bowl XX?\n
+            A: Chicago Bears\n
+            Q: Which was the first European country to abolish capital punishment?\n
+            A: Norway\n
+            Q: In which country did the widespread use of ISDN begin in 1988? A: Japan Q: What is Bruce Willis’ real first name? A: Walter Q: Which William wrote the novel Lord Of The Flies? A: Golding Q: Which innovation for the car was developed by Prince Henry of Prussia in 1911? A: Windshield wipers Q: How is musician William Lee Conley better known? A: Big Bill Broonzy Q: How is Joan Molinsky better known? A: Joan Rivers Q: In which branch of the arts is Patricia Neary famous? A: Ballet Q: Which country is Europe’s largest silk producer? A: Italy Q: The VS-300 was a type of what? A: Helicopter Q: At which university did Joseph Goebbels become a doctor of philosophy? A: Heidelberg Q: Which prince is Queen Elizabeth II’s youngest son? A: Edward Q: When did the founder of Jehovah’s Witnesses say the world would end? A: 1914 Q: Who found the remains of the Titanic? A: Robert Ballard Q: Who was the only Spice Girl not to have a middle name? A: Posh Spice Q: What are the international registration letters of a vehicle from Algeria? A: DZ Q: How did Jock die in Dallas? A: Helicopter accident Q: What star sign is Michael Caine? A: Pisces Q: Who wrote the novel Evening Class?A: Maeve Binchy Q: Which country does the airline Air Pacific come from? A: FijiQ: In which branch of the arts does Allegra Kent work? A: Ballet Q: Banting and Best pioneered the use of what? A: Insulin Q: Who directed the movie La Dolce Vita? A: Federico Fellini Q: Which country does the airline LACSA come from? A: Costa Rica Q: Who directed 2001: A Space Odyssey? A: Stanley Kubrick Q: Which is the largest of the Japanese Volcano Islands? A: Iwo Jima Q: """
+
+
 class Sampler(object):
     """Sampler to sample answer from the model."""
     def __init__(self, model_name: str, dataset: str) -> None:
@@ -21,31 +39,43 @@ class Sampler(object):
     def load_data(self) -> None:
         """Load the data based on the name of the dataset."""
         if self.dataset == 'mmlu':
-            data_file = '../data/mmlu_10k.json'
-            self.data = json.load(open(data_file, "r"))
+            self.data_file = '../../data/mmlu_10k.json'
+            self.data = json.load(open(self.data_file, "r"))
+        if self.dataset == 'trivia_qa':
+            self.data_file = '../../data/trivia_qa_train.pkl'
+            self.prompt_data_file = '../../data/trivia_qa_test.pkl'
+            self.data = pickle.load(open(self.data_file, "rb"))
+            self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
 
-    def format_prompt(self, example: dict) -> dict:
+    def format_prompt(self, example: dict, index: int, k_shot=0) -> dict:
         """Format the prompt for sampling.
 
         Args:
             example (dict): The data point object.
+            index (int): The index for id.
+            k_shot (int): The k shot for the trivia qa prompting.
 
         Returns:
             A dict which contain necessary example for sampling.
         """
         exp = dict()
-        exp["id"] = example["id"]
+        exp["id"] = index
         exp['answer'] = example['answer']
         prompt = ""
         if self.dataset == 'mmlu':
             prompt += "Question: " + example["question"] + "\nChoices:\n"
-        for k, v in example["choices"].items():
-            prompt += k + ". " + str(v) + "\n"
-        prompt += "Answer:"
+            for k, v in example["choices"].items():
+                prompt += k + ". " + str(v) + "\n"
+            prompt += " Answer: "
+        if self.dataset == 'trivia_qa':
+            PROMPT = "Answer these questions.\n"
+            for i in range(k_shot):
+                PROMPT += 'Q: ' + self.prompt_data[i]['question'] + '\nA: ' + self.prompt_data[i]['answer'] + '\n'
+            prompt += PROMPT + 'Q: ' + example['question'] + '\nA: '
         exp["prompt"] = prompt
         return exp
 
-    def sample(self, start: int, end: int, num_responses: int, stored_path='../output/') -> None:
+    def sample(self, start: int, end: int, num_responses: int, stored_path='../../output/', k_shot=0) -> None:
         """Sample the result for questions in the datasets, from the start index to end index, and stored in .pkl file.
 
         Args:
@@ -53,15 +83,13 @@ class Sampler(object):
             end (int): The end index of the sampling.
             num_responses (int): Time for sampling for a single point.
             stored_path (str): The path for .pkl saved path.
+            k_shot (int): The k shot for the trivia qa prompting.
         """
         stored_path = f'{stored_path}{self.dataset}_{start}_{end}.pkl'
         for i in range(start, end + 1):
-            for datam in self.data:
-                if datam['id'] == i:
-                    exp = self.format_prompt(datam)
-                    break
+            exp = self.format_prompt(self.data[i], index=i, k_shot=k_shot)
             print(exp)
-            responses = self.model.generate_response(exp['prompt'], num_responses)
+            responses = self.model.generate_response(exp['prompt'], num_responses, max_new_tokens=len(self.model._tokenizer(exp['answer'], add_special_tokens=False)))
             with open(stored_path, 'ab') as f:
                 pickle.dump({"id": exp['id'], 'prompt': exp['prompt'], 'responses': responses, 'answer': exp['answer']}, f)
 
@@ -74,11 +102,12 @@ def main() -> None:
     parser.add_argument('--start', type=int, required=True, help='The start index of the sampling.')
     parser.add_argument('--end', type=int, required=True, help='The end index of the sampling.')
     parser.add_argument('--num_responses', type=int, required=True, help='The sampling times.')
+    parser.add_argument('--k_shot', type=int, default=0, help='The value for k shot.')
     args = parser.parse_args()
     model_name = args.model_name
     dataset = args.dataset
     sampler = Sampler(model_name=model_name, dataset=dataset)
-    sampler.sample(start=args.start, end=args.end, num_responses=args.num_responses)
+    sampler.sample(start=args.start, end=args.end, num_responses=args.num_responses, k_shot=args.k_shot)
 
 
 if __name__ == '__main__':

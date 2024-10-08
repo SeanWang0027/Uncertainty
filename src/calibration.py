@@ -1,6 +1,7 @@
 """Calibration on API based method."""
 import numpy as np
 import pickle
+from collections import Counter
 from typing import List, Dict
 
 
@@ -12,13 +13,13 @@ def select_from_samples(sample_file: str) -> List:
     """
     with open(sample_file, 'rb') as f:
         samples = pickle.load(f)
-    for sample in samples:
-        for i in range(len(sample['responses'])):
-            if sample['responses'][i] != '':
-                sample['responses'][i] = sample['responses'][i][0]
+    # for sample in samples:
+    #     for i in range(len(sample['responses'])):
+    #         if sample['responses'][i] != '':
+    #             sample['responses'][i] = sample['responses'][i][0]
     calibration_set = []
     for i in range(len(samples)//2):
-        if len(set(samples[i]['responses'])) >= 3:
+        if len(set(samples[i]['responses'])) >= 3 and samples[i]['answer'] in samples[i]['responses']:
             calibration_set.append(samples[i])
     return calibration_set
 
@@ -33,7 +34,13 @@ def LAC_CP(sample: Dict, label: str) -> float:
     Returns:
         A float which is the conformal score of the true label.
     """
-    return 1 - sample['responses'].count(label) / len(sample['responses'])
+    F_score = - sample['responses'].count(label) / len(sample['responses'])
+    response_probs = [sample['responses'].count(resp) / len(sample['responses']) for resp in set(sample['responses'])]
+    H_score = 0.2 * sum(p * np.log2(p) for p in response_probs if p > 0)
+    response_counts = Counter(sample['responses'])
+    highest_response, highest_count = response_counts.most_common(1)[0]
+    print(highest_response, highest_count)
+    return F_score + H_score
 
 
 def calibration(calibration_set: List, error_rate: float) -> float:
@@ -67,24 +74,36 @@ def estimation(sample_file: str, threshold: float) -> float:
     """
     with open(sample_file, 'rb') as f:
         samples = pickle.load(f)
-    for sample in samples:
-        for i in range(len(sample['responses'])):
-            if sample['responses'][i] != '':
-                sample['responses'][i] = sample['responses'][i][0]
+    # for sample in samples:
+    #     for i in range(len(sample['responses'])):
+    #         if sample['responses'][i] != '':
+    #             sample['responses'][i] = sample['responses'][i][0]
     prediction_sets = dict()
+    total = 0
     coverate = 0
     for i in range(len(samples)//2, len(samples)):
         prediction_sets[samples[i]['id']] = []
         answer_set = set(samples[i]['responses'])
+        if samples[i]['answer'] not in answer_set:
+            continue
+        total += 1
         for answer in answer_set:
             if LAC_CP(samples[i], answer) < threshold:
                 if answer == samples[i]['answer']:
                     coverate += 1
                 prediction_sets[samples[i]['id']].append(answer)
-    return sum(len(value) for value in prediction_sets.values()) / len(prediction_sets), coverate / len(prediction_sets)
+    acc = 0
+    for i in range(len(samples)//2, len(samples)):
+        frequency_count = Counter(samples[i]['responses'])
+        most_common_element, highest_frequency = frequency_count.most_common(1)[0]
+        if most_common_element == samples[i]['answer']:
+            acc += 1
+    return sum(len(value) for value in prediction_sets.values()) / len(prediction_sets), coverate / total, acc / len(prediction_sets)
 
 
-calibration_set = select_from_samples('../output/mmlu_llama3.pkl')
-threshold = calibration(calibration_set, 0.05)
-avg_prediction_set_size, coverate = estimation('../output/mmlu_llama3.pkl', threshold)
-print(avg_prediction_set_size, coverate)
+calibration_set = select_from_samples('../output/trivia_qa/trivia_qa_llama3.pkl')
+print(len(calibration_set))
+threshold = calibration(calibration_set, 0.25)
+print(threshold)
+avg_prediction_set_size, coverate, acc = estimation('../output/trivia_qa/trivia_qa_llama3.pkl', threshold)
+print(avg_prediction_set_size, coverate, acc)

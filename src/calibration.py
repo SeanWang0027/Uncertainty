@@ -36,10 +36,9 @@ def LAC_CP(sample: Dict, label: str) -> float:
     """
     F_score = - sample['responses'].count(label) / len(sample['responses'])
     response_probs = [sample['responses'].count(resp) / len(sample['responses']) for resp in set(sample['responses'])]
-    H_score = 0.2 * sum(p * np.log2(p) for p in response_probs if p > 0)
+    H_score = 0.28 * sum(p * np.log2(p) for p in response_probs if p > 0)
     response_counts = Counter(sample['responses'])
     highest_response, highest_count = response_counts.most_common(1)[0]
-    print(highest_response, highest_count)
     return F_score + H_score
 
 
@@ -74,10 +73,6 @@ def estimation(sample_file: str, threshold: float) -> float:
     """
     with open(sample_file, 'rb') as f:
         samples = pickle.load(f)
-    # for sample in samples:
-    #     for i in range(len(sample['responses'])):
-    #         if sample['responses'][i] != '':
-    #             sample['responses'][i] = sample['responses'][i][0]
     prediction_sets = dict()
     total = 0
     coverate = 0
@@ -98,12 +93,12 @@ def estimation(sample_file: str, threshold: float) -> float:
         most_common_element, highest_frequency = frequency_count.most_common(1)[0]
         if most_common_element == samples[i]['answer']:
             acc += 1
-    return sum(len(value) for value in prediction_sets.values()) / len(prediction_sets), coverate / total, acc / len(prediction_sets)
+    return sum(len(value) for value in prediction_sets.values()) / len(prediction_sets), coverate / total, acc / total
 
 
-calibration_set = select_from_samples('../output/trivia_qa/trivia_qa_llama3.pkl')
+calibration_set = select_from_samples('../output/resample_trivia_qa_llama3.pkl')
 print(len(calibration_set))
-threshold = calibration(calibration_set, 0.25)
+threshold = calibration(calibration_set, 0.1)
 print(threshold)
 avg_prediction_set_size, coverate, acc = estimation('../output/trivia_qa/trivia_qa_llama3.pkl', threshold)
 print(avg_prediction_set_size, coverate, acc)

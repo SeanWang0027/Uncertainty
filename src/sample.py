@@ -3,6 +3,7 @@ import argparse
 import pickle
 import json
 from models import LanguageModel
+from tqdm import tqdm
 
 
 class Sampler(object):
@@ -28,6 +29,11 @@ class Sampler(object):
             self.prompt_data_file = '../../data/trivia_qa_test.pkl'
             self.data = pickle.load(open(self.data_file, "rb"))
             self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
+        if self.dataset == 'webquestions':
+            self.data_file = '../../data/webquestions_train.pkl'
+            self.prompt_data_file = '../../data/webquestions_test.pkl'
+            self.data = pickle.load(open(self.data_file, "rb"))
+            self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
 
     def format_prompt(self, example: dict, index: int, k_shot=0) -> dict:
         """Format the prompt for sampling.
@@ -42,7 +48,7 @@ class Sampler(object):
         """
         exp = dict()
         exp["id"] = index
-        exp['answer'] = example['answer']
+        exp['answer'] = example['answers'] if self.dataset == 'webquestions' else example['answer']
         prompt = ""
         if self.dataset == 'mmlu':
             prompt += "Question: " + example["question"] + "\nChoices:\n"
@@ -53,6 +59,12 @@ class Sampler(object):
             PROMPT = "Answer these questions.\n"
             for i in range(k_shot):
                 PROMPT += 'Q: ' + self.prompt_data[i]['question'] + '\nA: ' + self.prompt_data[i]['answer'] + '\n'
+            prompt += PROMPT + 'Q: ' + example['question'] + '\nA: '
+        if self.dataset == 'webquestions':
+            PROMPT = "Answer these questions.\n"
+            for i in range(k_shot):
+                answer = self.prompt_data[i]['answers'][0]
+                PROMPT += 'Q: ' + self.prompt_data[i]['question'] + '\nA: ' + answer + '\n'
             prompt += PROMPT + 'Q: ' + example['question'] + '\nA: '
         exp["prompt"] = prompt
         return exp
@@ -68,17 +80,32 @@ class Sampler(object):
             k_shot (int): The k shot for the trivia qa prompting.
         """
         stored_path = f'{stored_path}{self.dataset}_{start}_{end}.pkl'
-        end = min(end, len(self.data))
-        for i in range(start, end):
+        # with open(stored_path, 'rb') as f:
+        #     while True:
+        #         try:
+        #             data = pickle.load(f)
+        #             start = data['id']
+        #         except EOFError:
+        #             break
+        # end = min(end, len(self.data))
+        for i in tqdm(range(start, end)):
             exp = self.format_prompt(self.data[i], index=i, k_shot=k_shot)
-            max_tokens = 4 if len(self.model._tokenizer(' ' + exp['answer'], add_special_tokens=False)) < 4 else len(self.model._tokenizer(' ' + exp['answer'], add_special_tokens=False))
-            exp['responses'] = self.model.generate_response(exp['prompt'], exp['answer'], num_responses, max_new_tokens=max_tokens)
+            answer = exp['answer'][0] if self.dataset == 'webquestions' else exp['answer']
+            max_tokens = 4 if len(self.model._tokenizer(' ' + answer, add_special_tokens=False)) < 4 else len(self.model._tokenizer(' ' + exp['answer'], add_special_tokens=False))
+            exp['responses'] = self.model.generate_response(exp['prompt'], answer, num_responses, max_new_tokens=max_tokens)
             exp['exist_answer'] = False
+            exp['candidates_logit'] = dict()
             for key in exp['responses'].keys():  # PARTIAL MATCH RULES
-                if exp['answer'] in key:
+                if answer in key:
                     exp['exist_answer'] = True
+                    if answer not in exp['candidates_logit']:
+                        exp['candidates_logit'][answer] = 1
+                else:
+                    exp['candidates_logit'][key] = 1
+            if answer not in exp['candidates_logit']:
+                exp['candidates_logit'][answer] = 1
             if not exp['exist_answer']:
-                exp['responses'][exp['answer']] = 0
+                exp['responses'][answer] = 0
             exp = self.model.resample(exp)
             with open(stored_path, 'ab') as f:
                 pickle.dump(exp, f)

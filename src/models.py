@@ -108,8 +108,7 @@ class LanguageModel(object):
         Returns:
             A dictionary of the object.
         """
-        exp['candidates_logit'] = dict()
-        for answer in exp['responses'].keys():
+        for answer in exp['candidates_logit'].keys():
             input = exp['prompt'] + answer
             input_ids = self._tokenizer(input, return_tensors="pt").input_ids.to(self._device)
             with torch.no_grad():
@@ -122,8 +121,6 @@ class LanguageModel(object):
             # Retrieve the actual answer tokens
             answer_ids = input_ids[0, prompt_length - 1:].tolist()
             answer_tokens = self._tokenizer.convert_ids_to_tokens(answer_ids)
-            # Print probabilities for each answer token
-            exp['candidates_logit'][answer] = 1
             for i, token in enumerate(answer_tokens):
                 token_id = answer_ids[i]
                 token_prob = answer_probs[0, i, token_id].item()
@@ -135,3 +132,4 @@ class LanguageModel(object):
         exp['candidates_logit'] = {key: value / sum_exp_values for key, value in exp_values.items()}
         print(exp['candidates_logit'])
         return exp
+# Open-book QA; SQuad; wiki-QA

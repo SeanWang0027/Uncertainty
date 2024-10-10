@@ -5,24 +5,6 @@ import json
 from models import LanguageModel
 
 
-PROMPT = """Answer these questions.\n
-            Q: Which American-born Sinclair won the Nobel Prize for Literature in 1930?\n
-            A: Sinclair Lewis\n
-            Q: Where in England was Dame Judi Dench born?\n
-            A: York\n
-            Q: In which decade did Billboard magazine first publish an American hit chart?\n
-            A: 30s\n
-            Q: From which country did Angola achieve independence in 1975?\n
-            A: Portugal\n
-            Q: Which city does David Soul come from?\n
-            A: Chicago\n
-            Q: Who won Super Bowl XX?\n
-            A: Chicago Bears\n
-            Q: Which was the first European country to abolish capital punishment?\n
-            A: Norway\n
-            Q: In which country did the widespread use of ISDN begin in 1988? A: Japan Q: What is Bruce Willis’ real first name? A: Walter Q: Which William wrote the novel Lord Of The Flies? A: Golding Q: Which innovation for the car was developed by Prince Henry of Prussia in 1911? A: Windshield wipers Q: How is musician William Lee Conley better known? A: Big Bill Broonzy Q: How is Joan Molinsky better known? A: Joan Rivers Q: In which branch of the arts is Patricia Neary famous? A: Ballet Q: Which country is Europe’s largest silk producer? A: Italy Q: The VS-300 was a type of what? A: Helicopter Q: At which university did Joseph Goebbels become a doctor of philosophy? A: Heidelberg Q: Which prince is Queen Elizabeth II’s youngest son? A: Edward Q: When did the founder of Jehovah’s Witnesses say the world would end? A: 1914 Q: Who found the remains of the Titanic? A: Robert Ballard Q: Who was the only Spice Girl not to have a middle name? A: Posh Spice Q: What are the international registration letters of a vehicle from Algeria? A: DZ Q: How did Jock die in Dallas? A: Helicopter accident Q: What star sign is Michael Caine? A: Pisces Q: Who wrote the novel Evening Class?A: Maeve Binchy Q: Which country does the airline Air Pacific come from? A: FijiQ: In which branch of the arts does Allegra Kent work? A: Ballet Q: Banting and Best pioneered the use of what? A: Insulin Q: Who directed the movie La Dolce Vita? A: Federico Fellini Q: Which country does the airline LACSA come from? A: Costa Rica Q: Who directed 2001: A Space Odyssey? A: Stanley Kubrick Q: Which is the largest of the Japanese Volcano Islands? A: Iwo Jima Q: """
-
-
 class Sampler(object):
     """Sampler to sample answer from the model."""
     def __init__(self, model_name: str, dataset: str) -> None:
@@ -86,12 +68,20 @@ class Sampler(object):
             k_shot (int): The k shot for the trivia qa prompting.
         """
         stored_path = f'{stored_path}{self.dataset}_{start}_{end}.pkl'
-        for i in range(start, end + 1):
+        end = min(end, len(self.data))
+        for i in range(start, end):
             exp = self.format_prompt(self.data[i], index=i, k_shot=k_shot)
-            print(exp)
-            responses = self.model.generate_response(exp['prompt'], num_responses, max_new_tokens=len(self.model._tokenizer(exp['answer'], add_special_tokens=False)))
+            max_tokens = 4 if len(self.model._tokenizer(' ' + exp['answer'], add_special_tokens=False)) < 4 else len(self.model._tokenizer(' ' + exp['answer'], add_special_tokens=False))
+            exp['responses'] = self.model.generate_response(exp['prompt'], exp['answer'], num_responses, max_new_tokens=max_tokens)
+            exp['exist_answer'] = False
+            for key in exp['responses'].keys():  # PARTIAL MATCH RULES
+                if exp['answer'] in key:
+                    exp['exist_answer'] = True
+            if not exp['exist_answer']:
+                exp['responses'][exp['answer']] = 0
+            exp = self.model.resample(exp)
             with open(stored_path, 'ab') as f:
-                pickle.dump({"id": exp['id'], 'prompt': exp['prompt'], 'responses': responses, 'answer': exp['answer']}, f)
+                pickle.dump(exp, f)
 
 
 def main() -> None:

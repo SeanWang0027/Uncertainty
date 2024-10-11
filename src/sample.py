@@ -3,6 +3,7 @@ import argparse
 import pickle
 import json
 from models import LanguageModel
+from collections import defaultdict
 from tqdm import tqdm
 
 
@@ -87,21 +88,35 @@ class Sampler(object):
         #             start = data['id']
         #         except EOFError:
         #             break
-        # end = min(end, len(self.data))
+        end = min(end, len(self.data))
+        print(len(self.data))
+        # import pdb; pdb.set_trace()
         for i in tqdm(range(start, end)):
             exp = self.format_prompt(self.data[i], index=i, k_shot=k_shot)
             answer = exp['answer'][0] if self.dataset == 'webquestions' else exp['answer']
+            answers = exp['answer'] if self.dataset == 'webquestions' else [exp['answer']]
             max_tokens = 4 if len(self.model._tokenizer(' ' + answer, add_special_tokens=False)) < 4 else len(self.model._tokenizer(' ' + exp['answer'], add_special_tokens=False))
             exp['responses'] = self.model.generate_response(exp['prompt'], answer, num_responses, max_new_tokens=max_tokens)
             exp['exist_answer'] = False
             exp['candidates_logit'] = dict()
-            for key in exp['responses'].keys():  # PARTIAL MATCH RULES
-                if answer in key:
-                    exp['exist_answer'] = True
-                    if answer not in exp['candidates_logit']:
-                        exp['candidates_logit'][answer] = 1
-                else:
-                    exp['candidates_logit'][key] = 1
+            if self.dataset == 'webquestions':
+                responses = defaultdict(int)
+                for key, val in exp['responses'].items():
+                    for ans in answers:
+                        if ans in key:
+                            exp['exist_answer'] = True
+                            responses[answer] += val
+                            if ans not in exp['candidates_logit']:
+                                exp['candidates_logit'][ans] = 1
+                exp['responses'] = responses
+            if self.dataset == 'trivia_qa':
+                for key in exp['responses'].keys():  # PARTIAL MATCH RULES
+                    if answer in key:
+                        exp['exist_answer'] = True
+                        if answer not in exp['candidates_logit']:
+                            exp['candidates_logit'][answer] = 1
+                    else:
+                        exp['candidates_logit'][key] = 1
             if answer not in exp['candidates_logit']:
                 exp['candidates_logit'][answer] = 1
             if not exp['exist_answer']:

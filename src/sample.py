@@ -68,29 +68,15 @@ class Sampler(object):
             k_shot (int): The k shot for the trivia qa prompting.
         """
         stored_path = f'{stored_path}{self.dataset}_{start}_{end}.pkl'
-        with open(stored_path, 'rb') as f:
-            while True:
-                try:
-                    data = pickle.load(f)
-                    start = data['id']
-                except EOFError:
-                    break
         end = min(end, len(self.data))
-        for i in range(start + 1, end):
+        for i in range(start, end):
             exp = self.format_prompt(self.data[i], index=i, k_shot=k_shot)
             max_tokens = 4 if len(self.model._tokenizer(' ' + exp['answer'], add_special_tokens=False)) < 4 else len(self.model._tokenizer(' ' + exp['answer'], add_special_tokens=False))
             exp['responses'] = self.model.generate_response(exp['prompt'], exp['answer'], num_responses, max_new_tokens=max_tokens)
             exp['exist_answer'] = False
-            exp['candidates_logit'] = dict()
             for key in exp['responses'].keys():  # PARTIAL MATCH RULES
                 if exp['answer'] in key:
                     exp['exist_answer'] = True
-                    if exp['answer'] not in exp['candidates_logit']:
-                        exp['candidates_logit'][exp['answer']] = 1
-                else:
-                    exp['candidates_logit'][key] = 1
-            if exp['answer'] not in exp['candidates_logit']:
-                exp['candidates_logit'][exp['answer']] = 1
             if not exp['exist_answer']:
                 exp['responses'][exp['answer']] = 0
             exp = self.model.resample(exp)

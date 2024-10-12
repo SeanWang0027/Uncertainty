@@ -1,45 +1,53 @@
 """Calibration on API based method."""
+import os
 import numpy as np
 import pickle
-from collections import Counter
+import matplotlib.pyplot as plt
 from typing import List, Dict
 
 
-def select_from_samples(sample_file: str) -> List:
+def select_from_samples(sample_file: str, division: float) -> List:
     """Select the samples that can be used for calibration.
 
     Args:
         sample_file (str): The name of the samples stored file.
+        division (float): The division factor for dividing calibration set and estimation set.
+
+    Returns:
+        Three lists, in corresponding to whole data, calibration data and estimation data.
     """
+    data = []
     with open(sample_file, 'rb') as f:
-        samples = pickle.load(f)
-    # for sample in samples:
-    #     for i in range(len(sample['responses'])):
-    #         if sample['responses'][i] != '':
-    #             sample['responses'][i] = sample['responses'][i][0]
-    calibration_set = []
-    for i in range(len(samples)//2):
-        if len(set(samples[i]['responses'])) >= 3 and samples[i]['answer'] in samples[i]['responses']:
-            calibration_set.append(samples[i])
-    return calibration_set
+        while True:
+            try:
+                data.append(pickle.load(f))
+            except EOFError:
+                break
+    calibration_set = data[:int(len(data) * division)]
+    estimation_set = data[int(len(data) * division):]
+    return data, calibration_set, estimation_set
 
 
-def LAC_CP(sample: Dict, label: str) -> float:
+def LAC_CP(sample: Dict) -> float:
     """The Least Ambiguous set-valued Classifiers of conformal prediction on single sample.
 
     Args:
         sample (Dict): A dict object which is the sample of the point.
-        label (str): The label for calculation.
 
     Returns:
         A float which is the conformal score of the true label.
     """
-    F_score = - sample['responses'].count(label) / len(sample['responses'])
-    response_probs = [sample['responses'].count(resp) / len(sample['responses']) for resp in set(sample['responses'])]
-    H_score = 0.28 * sum(p * np.log2(p) for p in response_probs if p > 0)
-    response_counts = Counter(sample['responses'])
-    highest_response, highest_count = response_counts.most_common(1)[0]
-    return F_score + H_score
+    # F_score = - sample['responses'].count(label) / len(sample['responses'])
+    # response_probs = [sample['responses'].count(resp) / len(sample['responses']) for resp in set(sample['responses'])]
+    # H_score = 0.28 * sum(p * np.log2(p) for p in response_probs if p > 0)
+    # response_counts = Counter(sample['responses'])
+    # highest_response, highest_count = response_counts.most_common(1)[0]
+    # return F_score + H_score
+    non_conformity_value = 1
+    for response, prob in sample['candidates_logit'].items():
+        if sample['answer'] in response:
+            non_conformity_value -= prob
+    return non_conformity_value
 
 
 def calibration(calibration_set: List, error_rate: float) -> float:
@@ -54,51 +62,80 @@ def calibration(calibration_set: List, error_rate: float) -> float:
     """
     calibrated_score = []
     for sample in calibration_set:
-        calibrated_score.append(LAC_CP(sample, sample['answer']))
+        calibrated_score.append(LAC_CP(sample))
     n = len(calibration_set)
     q_level = np.ceil((n+1) * (1-error_rate)) / n
-    qhat = np.quantile(calibrated_score, q_level, method='higher')
-    return qhat
+    threshold = np.quantile(calibrated_score, q_level, method='higher')
+    return threshold
 
 
-def estimation(sample_file: str, threshold: float) -> float:
+def estimation(estimation_set: List, threshold: float, error_rate: float) -> float:
     """Returned the uncertainty estimation on the sampled result.
 
     Args:
-        sample_file (str): The sampled result of questions.
+        estimation_set (List): A list that contains the points for estimation.
         threshold (float): The threshold on calibration setting.
+        error_rate (float): The error rate for calibration on data.
 
     Returns:
-        A float that contained the final prediction set's size.
+        Three floats, that contained the final prediction expected coverrate, actual coverrate and avg set size for prediction set.
     """
-    with open(sample_file, 'rb') as f:
-        samples = pickle.load(f)
     prediction_sets = dict()
-    total = 0
     coverate = 0
-    for i in range(len(samples)//2, len(samples)):
-        prediction_sets[samples[i]['id']] = []
-        answer_set = set(samples[i]['responses'])
-        if samples[i]['answer'] not in answer_set:
-            continue
-        total += 1
-        for answer in answer_set:
-            if LAC_CP(samples[i], answer) < threshold:
-                if answer == samples[i]['answer']:
-                    coverate += 1
-                prediction_sets[samples[i]['id']].append(answer)
-    acc = 0
-    for i in range(len(samples)//2, len(samples)):
-        frequency_count = Counter(samples[i]['responses'])
-        most_common_element, highest_frequency = frequency_count.most_common(1)[0]
-        if most_common_element == samples[i]['answer']:
-            acc += 1
-    return sum(len(value) for value in prediction_sets.values()) / len(prediction_sets), coverate / total, acc / total
+    set_size = 0
+    for item in estimation_set:
+        prediction_sets[item['id']] = []
+        for answer, logit in item['candidates_logit'].items():
+            if 1 - logit <= threshold:
+                prediction_sets[item['id']].append(answer)
+        for sequence in prediction_sets[item['id']]:
+            if item['answer'] in sequence:
+                coverate += 1
+                break
+        if item['exist_answer']:
+            mark = -1
+            for sequence in prediction_sets[item['id']]:
+                if item['answer'] in sequence:
+                    mark += 1
+            set_size -= mark
+        set_size += len(prediction_sets[item['id']])
+    return 1-error_rate, coverate/len(estimation_set), set_size/len(estimation_set)
 
 
-calibration_set = select_from_samples('../output/resample_trivia_qa_llama3.pkl')
-print(len(calibration_set))
-threshold = calibration(calibration_set, 0.1)
-print(threshold)
-avg_prediction_set_size, coverate, acc = estimation('../output/trivia_qa/trivia_qa_llama3.pkl', threshold)
-print(avg_prediction_set_size, coverate, acc)
+def plot_calibration(expected_cover_rates: List, coverates: List, dataset='trivia_qa', start=0, end=1000, division=0.5) -> None:
+    """Plot the calibration figure.
+
+    Args:
+        expected_cover_rates (List): The expected cover rate list.
+        coverates (List): The actual cover rate.
+        dataset (str): The current estimation's dataset.
+        start (int): The start of the data points.
+        end (int): The end of the data points.
+        division (float): The division factor.
+    """
+    ground_truth = expected_cover_rates
+    plt.figure(figsize=(8, 6))
+    plt.plot(expected_cover_rates, ground_truth, linestyle='--', color='grey', label='Best Calibration line.')
+    plt.plot(expected_cover_rates, coverates, marker='o', color='blue', label='Empirical Coverage Rate')
+    plt.xlabel("Target Correctness Coverage Rate")
+    plt.ylabel("Empirical Correctness Coverage Rate")
+    plt.legend()
+    plt.grid(True)
+    save_path = f'../pics/{dataset}/{start}_{end}_{division}.png'
+    directory = os.path.dirname(save_path)
+    os.makedirs(directory, exist_ok=True)
+    plt.savefig(save_path)
+
+
+division = 0.5
+data, calibration_set, estimation_set = select_from_samples('../output/trivia_qa_7000_8000_30.pkl', division=division)
+error_rates = list(np.arange(0.05, 1.05, 0.05))
+target_coverates = []
+coverates = []
+for error_rate in error_rates:
+    target_coverates.append(1-error_rate)
+    threshold = calibration(calibration_set, error_rate)
+    expected_cover_rate, coverate, set_size = estimation(estimation_set, threshold, error_rate)
+    coverates.append(coverate)
+    print(expected_cover_rate, coverate, set_size)
+plot_calibration(expected_cover_rates=target_coverates, coverates=coverates, start=7000, end=8000, division=division)

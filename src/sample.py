@@ -107,8 +107,11 @@ class Sampler(object):
                         if ans in key:
                             exp['exist_answer'] = True
                             responses[answer] += val
-                            if ans not in exp['candidates_logit']:
-                                exp['candidates_logit'][ans] = 1
+                            if answer not in exp['candidates_logit']:
+                                exp['candidates_logit'][answer] = 1
+                        else:
+                            responses[key] += val
+                            exp['candidates_logit'][key] = 1
                 exp['responses'] = responses
             if self.dataset == 'trivia_qa':
                 for key in exp['responses'].keys():  # PARTIAL MATCH RULES

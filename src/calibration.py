@@ -43,9 +43,10 @@ def LAC_CP(sample: Dict) -> float:
     # response_counts = Counter(sample['responses'])
     # highest_response, highest_count = response_counts.most_common(1)[0]
     # return F_score + H_score
+    gt_answer = sample['answer'][0] if isinstance(sample['answer'], list) else sample['answer']
     non_conformity_value = 1
     for response, prob in sample['candidates_logit'].items():
-        if sample['answer'] in response:
+        if gt_answer in response:
             non_conformity_value -= prob
     return non_conformity_value
 
@@ -89,13 +90,14 @@ def estimation(estimation_set: List, threshold: float, error_rate: float) -> flo
             if 1 - logit <= threshold:
                 prediction_sets[item['id']].append(answer)
         for sequence in prediction_sets[item['id']]:
-            if item['answer'] in sequence:
+            gt_answer = item['answer'][0] if isinstance(item['answer'], list) else item['answer']
+            if gt_answer in sequence:
                 coverate += 1
                 break
         if item['exist_answer']:
             mark = -1
             for sequence in prediction_sets[item['id']]:
-                if item['answer'] in sequence:
+                if gt_answer in sequence:
                     mark += 1
             set_size -= mark
         set_size += len(prediction_sets[item['id']])
@@ -127,8 +129,8 @@ def plot_calibration(expected_cover_rates: List, coverates: List, dataset='trivi
     plt.savefig(save_path)
 
 
-division = 0.2
-data, calibration_set, estimation_set = select_from_samples('../output/trivia_qa_7000_8000_30.pkl', division=division)
+division = 0.5
+data, calibration_set, estimation_set = select_from_samples('../output/webquestions_0_1000.pkl', division=division)
 error_rates = list(np.arange(0.05, 1.05, 0.05))
 target_coverates = []
 coverates = []
@@ -138,4 +140,4 @@ for error_rate in error_rates:
     expected_cover_rate, coverate, set_size = estimation(estimation_set, threshold, error_rate)
     coverates.append(coverate)
     print(expected_cover_rate, coverate, set_size)
-plot_calibration(expected_cover_rates=target_coverates, coverates=coverates, start=7000, end=8000, division=division)
+plot_calibration(expected_cover_rates=target_coverates, coverates=coverates, dataset="webquestions", start=0, end=1000, division=division)

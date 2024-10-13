@@ -121,14 +121,16 @@ def plot_calibration(expected_cover_rates: List, coverates: List, dataset='trivi
     plt.ylabel("Empirical Correctness Coverage Rate")
     plt.legend()
     plt.grid(True)
-    save_path = f'../pics/{dataset}/{start}_{end}_{division}.png'
+    save_path = f'../pics/{dataset}/{dataset}_{division}_15.png'
     directory = os.path.dirname(save_path)
     os.makedirs(directory, exist_ok=True)
     plt.savefig(save_path)
 
 
-division = 0.2
-data, calibration_set, estimation_set = select_from_samples('../output/trivia_qa_7000_8000_30.pkl', division=division)
+division = 0.4
+start = 0
+end = 6000
+data, calibration_set, estimation_set = select_from_samples(f'../output/trivia_qa/trivia_qa_15.pkl', division=division)
 error_rates = list(np.arange(0.05, 1.05, 0.05))
 target_coverates = []
 coverates = []
@@ -138,4 +140,4 @@ for error_rate in error_rates:
     expected_cover_rate, coverate, set_size = estimation(estimation_set, threshold, error_rate)
     coverates.append(coverate)
     print(expected_cover_rate, coverate, set_size)
-plot_calibration(expected_cover_rates=target_coverates, coverates=coverates, start=7000, end=8000, division=division)
+plot_calibration(expected_cover_rates=target_coverates, coverates=coverates, start=start, end=end, division=division)

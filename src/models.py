@@ -116,10 +116,9 @@ class LanguageModel(object):
                 logits = outputs.logits
             prompt_ids = self._tokenizer(exp['prompt'], return_tensors="pt").input_ids
             prompt_length = prompt_ids.shape[1]
-            answer_logits = logits[:, prompt_length - 1:-1, :]
+            answer_logits = logits[:, prompt_length - 2:-1, :]
             answer_probs = F.softmax(answer_logits, dim=-1)
-            # Retrieve the actual answer tokens
-            answer_ids = input_ids[0, prompt_length:].tolist()
+            answer_ids = input_ids[0, prompt_length - 1:].tolist()
             answer_tokens = self._tokenizer.convert_ids_to_tokens(answer_ids)
             for i, token in enumerate(answer_tokens):
                 token_id = answer_ids[i]

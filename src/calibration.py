@@ -43,9 +43,10 @@ def LAC_CP(sample: Dict) -> float:
     # response_counts = Counter(sample['responses'])
     # highest_response, highest_count = response_counts.most_common(1)[0]
     # return F_score + H_score
+    gt_answer = sample['answer'][0] if isinstance(sample['answer'], list) else sample['answer']
     non_conformity_value = 1
     for response, prob in sample['candidates_logit'].items():
-        if sample['answer'] in response:
+        if gt_answer in response:
             non_conformity_value -= prob
     return non_conformity_value
 
@@ -89,13 +90,14 @@ def estimation(estimation_set: List, threshold: float, error_rate: float) -> flo
             if 1 - logit <= threshold:
                 prediction_sets[item['id']].append(answer)
         for sequence in prediction_sets[item['id']]:
-            if item['answer'] in sequence:
+            gt_answer = item['answer'][0] if isinstance(item['answer'], list) else item['answer']
+            if gt_answer in sequence:
                 coverate += 1
                 break
         if item['exist_answer']:
             mark = -1
             for sequence in prediction_sets[item['id']]:
-                if item['answer'] in sequence:
+                if gt_answer in sequence:
                     mark += 1
             set_size -= mark
         set_size += len(prediction_sets[item['id']])

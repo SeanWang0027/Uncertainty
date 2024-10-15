@@ -36,6 +36,11 @@ class Sampler(object):
             self.prompt_data_file = '../../data/webquestions_test.pkl'
             self.data = pickle.load(open(self.data_file, "rb"))
             self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
+        if self.dataset == 'SQuAD':
+            self.data_file = '../../data/SQuAD_train.pkl'
+            self.prompt_data_file = '../../data/SQuAD_validation.pkl'
+            self.data = pickle.load(open(self.data_file, "rb"))
+            self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
 
     def format_prompt(self, example: dict, index: int, k_shot=0) -> dict:
         """Format the prompt for sampling.
@@ -68,6 +73,20 @@ class Sampler(object):
                 answer = self.prompt_data[i]['answers'][0]
                 PROMPT += 'Q: ' + self.prompt_data[i]['question'] + '\nA: ' + answer + '\n'
             prompt += PROMPT + 'Q: ' + example['question'] + '\nA: '
+        if self.dataset == 'SQuAD':
+            title = []
+            PROMPT = "Answer these questions.\n"
+            i = 0
+            while len(title) <= k_shot:
+                if self.prompt_data[i]['title'] in title:
+                    i += 1
+                    continue
+                title.append(self.prompt_data[i]['title'])
+                context = self.prompt_data[i]['context']
+                answer = self.prompt_data[i]['answer']
+                PROMPT += 'Context: ' + context + '\nQuestion: ' + self.prompt_data[i]['question'] + '\nAnswer: ' + answer + '\n'
+                i += 1
+            prompt += PROMPT + 'Context: ' + example['context'] + '\nQuestion: ' + example['question'] + '\nAnswer: '
         exp["prompt"] = prompt
         return exp
 
@@ -113,7 +132,7 @@ class Sampler(object):
                             responses[key] += val
                             exp['candidates_logit'][key] = 1
                 exp['responses'] = responses
-            if self.dataset == 'trivia_qa':
+            if self.dataset == 'trivia_qa' or self.dataset == 'SQuAD':
                 for key in exp['responses'].keys():  # PARTIAL MATCH RULES
                     if answer in key:
                         exp['exist_answer'] = True

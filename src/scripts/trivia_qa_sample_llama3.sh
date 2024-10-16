@@ -12,7 +12,7 @@ MODEL_NAME='meta-llama/Meta-Llama-3-8B'
 DATASET='trivia_qa'
 START=0
 END=1000
-NUM_RESPONSES=30
+NUM_RESPONSES=5
 K_SHOT=32
 while [[ "$#" -gt 0 ]]; do
     case $1 in

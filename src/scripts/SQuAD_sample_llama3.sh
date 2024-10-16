@@ -12,7 +12,7 @@ MODEL_NAME='meta-llama/Meta-Llama-3-8B'
 DATASET='SQuAD'
 START=0
 END=1000
-NUM_RESPONSES=5
+NUM_RESPONSES=15
 K_SHOT=4
 while [[ "$#" -gt 0 ]]; do
     case $1 in

@@ -66,6 +66,7 @@ def calibration(calibration_set: List, error_rate: float) -> float:
         calibrated_score.append(LAC_CP(sample))
     n = len(calibration_set)
     q_level = np.ceil((n+1) * (1-error_rate)) / n
+    print('q_level:', q_level)
     threshold = np.quantile(calibrated_score, q_level, method='higher')
     return threshold
 
@@ -123,7 +124,7 @@ def plot_calibration(expected_cover_rates: List, coverates: List, dataset='trivi
     plt.ylabel("Empirical Correctness Coverage Rate")
     plt.legend()
     plt.grid(True)
-    save_path = f'../pics/{dataset}/{dataset}_{division}_10.png'
+    save_path = f'../pics/{dataset}/{dataset}_{division}_30.png'
     directory = os.path.dirname(save_path)
     os.makedirs(directory, exist_ok=True)
     plt.savefig(save_path)
@@ -132,14 +133,15 @@ def plot_calibration(expected_cover_rates: List, coverates: List, dataset='trivi
 division = 0.50
 start = 0
 end = 6000
-data, calibration_set, estimation_set = select_from_samples(f'../output/trivia_qa/trivia_qa_10.pkl', division=division)
+data, calibration_set, estimation_set = select_from_samples(f'../output/SQuAD_0_1000_30.pkl', division=division)
 error_rates = list(np.arange(0.05, 1.05, 0.05))
 target_coverates = []
 coverates = []
 for error_rate in error_rates:
     target_coverates.append(1-error_rate)
     threshold = calibration(calibration_set, error_rate)
+    print(threshold)
     expected_cover_rate, coverate, set_size = estimation(estimation_set, threshold, error_rate)
     coverates.append(coverate)
     print(expected_cover_rate, coverate, set_size)
-plot_calibration(expected_cover_rates=target_coverates, coverates=coverates, start=start, end=end, division=division)
+plot_calibration(expected_cover_rates=target_coverates, coverates=coverates, dataset='SQuAD', start=start, end=end, division=division)

@@ -129,8 +129,8 @@ def plot_calibration(expected_cover_rates: List, coverates: List, dataset='trivi
     plt.savefig(save_path)
 
 
-division = 0.5
-data, calibration_set, estimation_set = select_from_samples('../output/webquestions_0_1000.pkl', division=division)
+division = 0.2
+data, calibration_set, estimation_set = select_from_samples('../output/webquestions_0_1000_15.pkl', division=division)
 error_rates = list(np.arange(0.05, 1.05, 0.05))
 target_coverates = []
 coverates = []

@@ -2,17 +2,21 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 data = []
-with open('../output/trivia_qa_7000_8000.pkl', 'rb') as f:
+output_file = '../output/webquestions_0_1000.pkl'
+
+with open(output_file, 'rb') as f:
     while True:
         try:
             data.append(pickle.load(f))
         except EOFError:
             break
+data = data[:1000]
 def LAC_CP(exp):
     non_conformity_value = 1
     for response, prob in exp['candidates_logit'].items():
-        if exp['answer'] in response:
-            non_conformity_value -= prob
+        for answer in exp['answer']:
+            if answer in response:
+                non_conformity_value -= prob
     return non_conformity_value
 calibration_set = data[:200]
 estimation_set = data[200:]
@@ -21,7 +25,7 @@ error_rates = list(np.arange(0.05, 1.05, 0.05))
 target_coverates = []
 coverates = []
 for error_rate in error_rates:
-    error_rate = 0.2
+    error_rate = 0.1
     target_coverates.append(1-error_rate)
     for sample in calibration_set:
         calibrated_score.append(LAC_CP(sample))
@@ -39,14 +43,17 @@ for error_rate in error_rates:
             if 1 - logit <= threshold:
                 prediction_sets[item['id']].append(answer)
         for sequence in prediction_sets[item['id']]:
-            if item['answer'] in sequence:
-                coverate += 1
-                break
+            answer = item['answer']
+            for ans in answer:
+                if ans in sequence:
+                    coverate += 1
+                    break
         if item['exist_answer']:
             mark = -1
             for sequence in prediction_sets[item['id']]:
-                if item['answer'] in sequence:
-                    mark += 1
+                for ans in item['answer']:
+                    if ans in sequence:
+                        mark += 1
             set_size -= mark
         set_size += len(prediction_sets[item['id']])
     coverates.append(coverate/len(estimation_set))

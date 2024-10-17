@@ -10,9 +10,9 @@
 
 MODEL_NAME='meta-llama/Meta-Llama-3-8B'
 DATASET='webquestions'
-START=0
-END=1000
-NUM_RESPONSES=30
+START=1000
+END=4000
+NUM_RESPONSES=15
 K_SHOT=32
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -22,7 +22,7 @@ while [[ "$#" -gt 0 ]]; do
     esac
     shift
 done
-CUDA_VISIBLE_DEVICES=2 python ../sample.py \
+CUDA_VISIBLE_DEVICES=3 python ../sample.py \
     --model_name $MODEL_NAME \
     --dataset $DATASET \
     --start $START \

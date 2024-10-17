@@ -1,5 +1,6 @@
 """Load Dataset."""
 import pickle
+import wikipediaapi
 from datasets import load_dataset
 
 
@@ -70,5 +71,45 @@ def Load_WebQuestions(path: str) -> None:
         pickle.dump(test_data, f)
 
 
-Load_SQuAD('../data/')
-Load_WebQuestions('../data/')
+def Load_WikiQA(path: str):
+    """Load the WikiQA Dataset.
+
+    Args:
+        path (str): The path for storing the data in that pkl file.
+    """
+    dataset = load_dataset("microsoft/wiki_qa")
+    train_dataset = dataset['train']
+    test_dataset = dataset['test']
+    train_store_path = f'{path}WikiQA_train.pkl'
+    test_store_path = f'{path}WikiQA_test.pkl'
+    train_data = []
+    test_data = []
+    wiki_wiki = wikipediaapi.Wikipedia('Uncertainty', 'en')
+    mark = 0
+    for i in range(len(train_dataset)):
+        if train_dataset[i]['label'] == 0:
+            continue
+        sample_dict = dict()
+        sample_dict['id'] = mark
+        mark += 1
+        sample_dict['question'] = train_dataset[i]['question']
+        sample_dict['answer'] = train_dataset[i]['answer']
+        sample_dict['context'] = wiki_wiki.page(train_dataset[i]['document_title']).summary[:500]
+        train_data.append(sample_dict)
+        print(mark)
+    with open(train_store_path, 'ab') as f:
+        pickle.dump(train_data, f)
+    mark = 0
+    for i in range(len(test_dataset)):
+        if test_dataset[i]['label'] == 0:
+            continue
+        sample_dict = dict()
+        sample_dict['id'] = mark
+        mark += 1
+        sample_dict['question'] = test_dataset[i]['question']
+        sample_dict['answer'] = test_dataset[i]['answer']
+        sample_dict['context'] = wiki_wiki.page(test_dataset[i]['document_title']).summary[:500]
+        test_data.append(sample_dict)
+        print(mark)
+    with open(test_store_path, 'ab') as f:
+        pickle.dump(test_data, f)

@@ -8,20 +8,15 @@ import torch.nn.functional as F
 
 _VALID_LM_NAMES = {
     'gpt2',
-    'gpt2-medium',
-    'gpt2-large',
-    'gpt2-xl',
     'mistralai/Mistral-7B-v0.1',
     'tiiuae/falcon-7b',
     'mosaicml/mpt-7b',
     '01-ai/Yi-6B',
-    'meta-llama/Meta-Llama-3-8B',
-    'meta-llama/Meta-Llama-3.1-8B',
-    'meta-llama/Llama-2-13b'
+    'meta-llama/Meta-Llama-3-8B'
 }
 
 
-_TOKEN = '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'
+_TOKEN = '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'
 
 
 class StopOnNewline(StoppingCriteria):

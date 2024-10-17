@@ -99,7 +99,9 @@ class Sampler(object):
         model_name = 'llama3/'
         if self.model._model_name == 'mistralai/Mistral-7B-v0.1':
             model_name = 'mistral/'
-        stored_path = f'{stored_path}{model_name}{self.dataset}_{start}_{end}_{num_responses}.pkl'
+        if not os.path.exists(f'{stored_path}{model_name}{self.dataset}/'):
+            os.makedirs(f'{stored_path}{model_name}{self.dataset}/', exist_ok=True)
+        stored_path = f'{stored_path}{model_name}{self.dataset}/{self.dataset}_{start}_{end}_{num_responses}.pkl'
         if os.path.exists(stored_path):
             with open(stored_path, 'rb') as f:
                 while True:

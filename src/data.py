@@ -48,31 +48,27 @@ def Load_WebQuestions(path: str) -> None:
     dataset = load_dataset("web_questions")
     train_dataset = dataset['train']
     test_dataset = dataset['test']
-    
     train_store_path = f'{path}WebQuestions_train.pkl'
     test_store_path = f'{path}WebQuestions_test.pkl'
     train_data = []
     test_data = []
-    
     for i in range(len(train_dataset)):
         sample_dict = dict()
         sample_dict['id'] = i
         sample_dict['question'] = train_dataset[i]['question']
         sample_dict['answers'] = train_dataset[i]['answers']
         train_data.append(sample_dict)
-    
     with open(train_store_path, 'ab') as f:
         pickle.dump(train_data, f)
-    
     for i in range(len(test_dataset)):
         sample_dict = dict()
         sample_dict['id'] = i
         sample_dict['question'] = test_dataset[i]['question']
         sample_dict['answers'] = test_dataset[i]['answers']
         test_data.append(sample_dict)
-    
     with open(test_store_path, 'ab') as f:
         pickle.dump(test_data, f)
+
 
 Load_SQuAD('../data/')
 Load_WebQuestions('../data/')

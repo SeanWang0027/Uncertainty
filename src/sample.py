@@ -100,7 +100,10 @@ class Sampler(object):
             stored_path (str): The path for .pkl saved path.
             k_shot (int): The k shot for the trivia qa prompting.
         """
-        stored_path = f'{stored_path}{self.dataset}_{start}_{end}_{num_responses}.pkl'
+        model_name = 'llama3/'
+        if self.model._model_name == 'mistralai/Mistral-7B-v0.1':
+            model_name = 'mistral/'
+        stored_path = f'{stored_path}{model_name}{self.dataset}_{start}_{end}_{num_responses}.pkl'
         if os.path.exists(stored_path):
             with open(stored_path, 'rb') as f:
                 while True:

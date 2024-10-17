@@ -22,7 +22,7 @@ while [[ "$#" -gt 0 ]]; do
     esac
     shift
 done
-CUDA_VISIBLE_DEVICES=2 python ../sample.py \
+CUDA_VISIBLE_DEVICES=2 python ../../sample.py \
     --model_name $MODEL_NAME \
     --dataset $DATASET \
     --start $START \

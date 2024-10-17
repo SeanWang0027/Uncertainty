@@ -2,7 +2,6 @@
 import os
 import argparse
 import pickle
-import json
 from models import LanguageModel
 from collections import defaultdict
 from tqdm import tqdm
@@ -23,22 +22,19 @@ class Sampler(object):
 
     def load_data(self) -> None:
         """Load the data based on the name of the dataset."""
-        if self.dataset == 'mmlu':
-            self.data_file = '../../data/mmlu_10k.json'
-            self.data = json.load(open(self.data_file, "r"))
         if self.dataset == 'trivia_qa':
-            self.data_file = '../../data/trivia_qa_train.pkl'
-            self.prompt_data_file = '../../data/trivia_qa_test.pkl'
+            self.data_file = '../../../data/trivia_qa_train.pkl'
+            self.prompt_data_file = '../../../data/trivia_qa_test.pkl'
             self.data = pickle.load(open(self.data_file, "rb"))
             self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
         if self.dataset == 'webquestions':
-            self.data_file = '../../data/webquestions_train.pkl'
-            self.prompt_data_file = '../../data/webquestions_test.pkl'
+            self.data_file = '../../../data/webquestions_train.pkl'
+            self.prompt_data_file = '../../../data/webquestions_test.pkl'
             self.data = pickle.load(open(self.data_file, "rb"))
             self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
         if self.dataset == 'SQuAD':
-            self.data_file = '../../data/SQuAD_train.pkl'
-            self.prompt_data_file = '../../data/SQuAD_validation.pkl'
+            self.data_file = '../../../data/SQuAD_train.pkl'
+            self.prompt_data_file = '../../../data/SQuAD_validation.pkl'
             self.data = pickle.load(open(self.data_file, "rb"))
             self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
 
@@ -90,7 +86,7 @@ class Sampler(object):
         exp["prompt"] = prompt
         return exp
 
-    def sample(self, start: int, end: int, num_responses: int, stored_path='../../output/', k_shot=0) -> None:
+    def sample(self, start: int, end: int, num_responses: int, stored_path='../../../output/', k_shot=0) -> None:
         """Sample the result for questions in the datasets, from the start index to end index, and stored in .pkl file.
 
         Args:

@@ -37,12 +37,6 @@ def LAC_CP(sample: Dict) -> float:
     Returns:
         A float which is the conformal score of the true label.
     """
-    # F_score = - sample['responses'].count(label) / len(sample['responses'])
-    # response_probs = [sample['responses'].count(resp) / len(sample['responses']) for resp in set(sample['responses'])]
-    # H_score = 0.28 * sum(p * np.log2(p) for p in response_probs if p > 0)
-    # response_counts = Counter(sample['responses'])
-    # highest_response, highest_count = response_counts.most_common(1)[0]
-    # return F_score + H_score
     gt_answer = sample['answer'][0] if isinstance(sample['answer'], list) else sample['answer']
     non_conformity_value = 1
     for response, prob in sample['candidates_logit'].items():
@@ -51,19 +45,41 @@ def LAC_CP(sample: Dict) -> float:
     return non_conformity_value
 
 
-def calibration(calibration_set: List, error_rate: float) -> float:
+def APS_CP(sample: Dict, label: str) -> float:
+    """The Adaptive Prediction Sets of conformal prediction on single sample.
+
+    Args:
+        sample (Dict): A dict object which is the sample of the point.
+        label (str): The label for APS nonconformity function.
+
+    Returns:
+        A float which is the conformal score of the true label.
+    """
+    non_conformity_value = 0
+    for response, prob in sample['candidates_logit'].items():
+        if prob >= sample['candidates_logit'][label]:
+            non_conformity_value += prob
+    return non_conformity_value
+
+
+def calibration(calibration_set: List, error_rate: float, nonconformity_method='LAC') -> float:
     """Using conformal prediction on calibration data.
 
     Args:
         calibration_set (List): The samples list from the selection of samples from the sampled question.
         error_rate (float): The error rate for calibration on data.
+        nonconformity_method (str): The method for nonconformity function.
 
     Returns:
         A float which is the threshold for prediction set construction.
     """
     calibrated_score = []
     for sample in calibration_set:
-        calibrated_score.append(LAC_CP(sample))
+        if nonconformity_method == 'LAC':
+            calibrated_score.append(LAC_CP(sample))
+        else:
+            gt_answer = sample['answer'][0] if isinstance(sample['answer'], list) else sample['answer']
+            calibrated_score.append(APS_CP(sample, gt_answer))
     n = len(calibration_set)
     q_level = np.ceil((n+1) * (1-error_rate)) / n
     print('q_level:', q_level)
@@ -71,13 +87,14 @@ def calibration(calibration_set: List, error_rate: float) -> float:
     return threshold
 
 
-def estimation(estimation_set: List, threshold: float, error_rate: float) -> float:
+def estimation(estimation_set: List, threshold: float, error_rate: float, nonconformity_method='LAC') -> float:
     """Returned the uncertainty estimation on the sampled result.
 
     Args:
         estimation_set (List): A list that contains the points for estimation.
         threshold (float): The threshold on calibration setting.
         error_rate (float): The error rate for calibration on data.
+        nonconformity_method (str): The method for nonconformity function.
 
     Returns:
         Three floats, that contained the final prediction expected coverrate, actual coverrate and avg set size for prediction set.
@@ -88,8 +105,12 @@ def estimation(estimation_set: List, threshold: float, error_rate: float) -> flo
     for item in estimation_set:
         prediction_sets[item['id']] = []
         for answer, logit in item['candidates_logit'].items():
-            if 1 - logit <= threshold:
-                prediction_sets[item['id']].append(answer)
+            if nonconformity_method == 'LAC':
+                if 1 - logit <= threshold:
+                    prediction_sets[item['id']].append(answer)
+            else:
+                if APS_CP(item, answer) <= threshold:
+                    prediction_sets[item['id']].append(answer)
         for sequence in prediction_sets[item['id']]:
             gt_answer = item['answer'][0] if isinstance(item['answer'], list) else item['answer']
             if gt_answer in sequence:
@@ -124,7 +145,7 @@ def plot_calibration(expected_cover_rates: List, coverates: List, dataset='trivi
     plt.ylabel("Empirical Correctness Coverage Rate")
     plt.legend()
     plt.grid(True)
-    save_path = f'../pics/{dataset}/{dataset}_{division}_30.png'
+    save_path = f'../pics/mistral/{dataset}/{dataset}_{division}_5.png'
     directory = os.path.dirname(save_path)
     os.makedirs(directory, exist_ok=True)
     plt.savefig(save_path)
@@ -133,15 +154,15 @@ def plot_calibration(expected_cover_rates: List, coverates: List, dataset='trivi
 division = 0.50
 start = 0
 end = 6000
-data, calibration_set, estimation_set = select_from_samples(f'../output/SQuAD_0_1000_30.pkl', division=division)
+data, calibration_set, estimation_set = select_from_samples('../output/mistral/trivia_qa/trivia_qa_0_2000_5.pkl', division=division)
 error_rates = list(np.arange(0.05, 1.05, 0.05))
 target_coverates = []
 coverates = []
 for error_rate in error_rates:
     target_coverates.append(1-error_rate)
-    threshold = calibration(calibration_set, error_rate)
+    threshold = calibration(calibration_set, error_rate, 'APS')
     print(threshold)
-    expected_cover_rate, coverate, set_size = estimation(estimation_set, threshold, error_rate)
+    expected_cover_rate, coverate, set_size = estimation(estimation_set, threshold, error_rate, 'APS')
     coverates.append(coverate)
     print(expected_cover_rate, coverate, set_size)
-plot_calibration(expected_cover_rates=target_coverates, coverates=coverates, dataset='SQuAD', start=start, end=end, division=division)
+plot_calibration(expected_cover_rates=target_coverates, coverates=coverates, dataset='trivia_qa', start=start, end=end, division=division)

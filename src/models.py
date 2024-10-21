@@ -16,7 +16,7 @@ _VALID_LM_NAMES = {
 }
 
 
-_TOKEN = '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'
+_TOKEN = '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'
 
 
 class StopOnNewline(StoppingCriteria):

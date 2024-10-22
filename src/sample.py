@@ -13,7 +13,9 @@ _VALID_LM_NAMES = {
     'tiiuae/falcon-7b': 'falcon',
     'mosaicml/mpt-7b': 'mpt',
     '01-ai/Yi-6B': 'yi',
-    'meta-llama/Meta-Llama-3-8B': 'llama3'
+    'meta-llama/Meta-Llama-3-8B': 'llama3',
+    "google/gemma-2-9b-it": "gemma",
+    "meta-llama/Llama-2-7b-hf": "llama2"
 }
 
 class Sampler(object):

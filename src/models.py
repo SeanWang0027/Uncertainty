@@ -12,7 +12,9 @@ _VALID_LM_NAMES = {
     'tiiuae/falcon-7b',
     'mosaicml/mpt-7b',
     '01-ai/Yi-6B',
-    'meta-llama/Meta-Llama-3-8B'
+    'meta-llama/Meta-Llama-3-8B',
+    "meta-llama/Llama-2-7b-hf",
+    "google/gemma-2-9b-it"
 }
 
 

@@ -18,6 +18,7 @@ _VALID_LM_NAMES = {
     "meta-llama/Llama-2-7b-hf": "llama2"
 }
 
+
 class Sampler(object):
     """Sampler to sample answer from the model."""
     def __init__(self, model_name: str, dataset: str) -> None:

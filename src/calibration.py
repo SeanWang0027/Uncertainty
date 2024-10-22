@@ -4,6 +4,7 @@ import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 from typing import List, Dict
+import argparse
 
 
 def select_from_samples(sample_file: str, division: float) -> List:
@@ -151,18 +152,44 @@ def plot_calibration(expected_cover_rates: List, coverates: List, dataset='trivi
     plt.savefig(save_path)
 
 
-division = 0.50
-start = 0
-end = 6000
-data, calibration_set, estimation_set = select_from_samples('../output/mistral/trivia_qa/trivia_qa_0_2000_5.pkl', division=division)
-error_rates = list(np.arange(0.05, 1.05, 0.05))
-target_coverates = []
-coverates = []
-for error_rate in error_rates:
-    target_coverates.append(1-error_rate)
-    threshold = calibration(calibration_set, error_rate, 'APS')
-    print(threshold)
-    expected_cover_rate, coverate, set_size = estimation(estimation_set, threshold, error_rate, 'APS')
-    coverates.append(coverate)
-    print(expected_cover_rate, coverate, set_size)
-plot_calibration(expected_cover_rates=target_coverates, coverates=coverates, dataset='trivia_qa', start=start, end=end, division=division)
+# division = 0.50
+# start = 0
+# end = 6000
+# data, calibration_set, estimation_set = select_from_samples('../output/mistral/trivia_qa/trivia_qa_0_2000_5.pkl', division=division)
+# error_rates = list(np.arange(0.05, 1.05, 0.05))
+# target_coverates = []
+# coverates = []
+# for error_rate in error_rates:
+#     target_coverates.append(1-error_rate)
+#     threshold = calibration(calibration_set, error_rate, 'APS')
+#     print(threshold)
+#     expected_cover_rate, coverate, set_size = estimation(estimation_set, threshold, error_rate, 'APS')
+#     coverates.append(coverate)
+#     print(expected_cover_rate, coverate, set_size)
+# plot_calibration(expected_cover_rates=target_coverates, coverates=coverates, dataset='trivia_qa', start=start, end=end, division=division)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Calibration on API based method')
+    parser.add_argument('--division', type=float, default=0.5, help='Division factor for calibration and estimation sets')
+    parser.add_argument('--start', type=int, default=0, help='Start index of the dataset')
+    parser.add_argument('--end', type=int, default=6000, help='End index of the dataset')
+    parser.add_argument('--input_data', type=str, required=True, help='Path to the input data file')
+    parser.add_argument('--dataset', type=str, default='trivia_qa', help='Name of the dataset')
+    parser.add_argument('--nonconformity_method', type=str, default='LAC', help='Nonconformity method to use (LAC or APS)')
+
+    args = parser.parse_args()
+    data, calibration_set, estimation_set = select_from_samples(args.input_data, division=args.division)
+
+    error_rates = list(np.arange(0.05, 1.05, 0.05))
+    target_coverates = []
+    coverates = []
+
+    for error_rate in error_rates:
+        target_coverates.append(1-error_rate)
+        threshold = calibration(calibration_set, error_rate, args.nonconformity_method)
+        print(f"Threshold: {threshold}")
+        expected_cover_rate, coverate, set_size = estimation(estimation_set, threshold, error_rate, args.nonconformity_method)
+        coverates.append(coverate)
+        print(f"Expected Coverage Rate: {expected_cover_rate}, Empirical Coverage Rate: {coverate}, Set Size: {set_size}")
+
+    plot_calibration(expected_cover_rates=target_coverates, coverates=coverates, dataset=args.dataset, start=args.start, end=args.end, division=args.division)

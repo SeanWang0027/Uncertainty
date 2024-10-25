@@ -7,6 +7,16 @@ from collections import defaultdict
 from tqdm import tqdm
 
 
+_VALID_LM_NAMES = {
+    'gpt2': 'gpt2',
+    'mistralai/Mistral-7B-v0.1': 'mistral',
+    'tiiuae/falcon-7b': 'falcon',
+    'mosaicml/mpt-7b': 'mpt',
+    '01-ai/Yi-6B': 'yi',
+    'meta-llama/Meta-Llama-3-8B': 'llama3'
+}
+
+
 class Sampler(object):
     """Sampler to sample answer from the model."""
     def __init__(self, model_name: str, dataset: str) -> None:
@@ -110,19 +120,8 @@ class Sampler(object):
             stored_path (str): The path for .pkl saved path.
             k_shot (int): The k shot for the trivia qa prompting.
         """
-        model_name = 'llama3/'
-        if self.model._model_name == 'mistralai/Mistral-7B-v0.1':
-            model_name = 'mistral/'
-        if self.model._model_name == 'tiiuae/falcon-7b':
-            model_name = 'falcon/'
-        if self.model._model_name == 'mosaicml/mpt-7b':
-            model_name = 'mpt/'
-        if self.model._model_name == '01-ai/Yi-6B':
-            model_name = 'Yi/'
-        if self.model._model_name == 'google/gemma-2-9b-it':
-            model_name = 'gemma/'
-        if self.model._model_name == 'meta-llama/Llama-2-7b-hf':
-            model_name = 'llama2/'
+        if self.model._model_name in _VALID_LM_NAMES:
+            model_name = _VALID_LM_NAMES[self.model._model_name] + '/'
         if not os.path.exists(f'{stored_path}{model_name}{self.dataset}/'):
             os.makedirs(f'{stored_path}{model_name}{self.dataset}/', exist_ok=True)
         stored_path = f'{stored_path}{model_name}{self.dataset}/{self.dataset}_{start}_{end}_{num_responses}.pkl'

@@ -33,8 +33,13 @@ class Sampler(object):
             self.data = pickle.load(open(self.data_file, "rb"))
             self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
         if self.dataset == 'SQuAD':
-            self.data_file = '../../../data/SQuAD_train.pkl'
-            self.prompt_data_file = '../../../data/SQuAD_validation.pkl'
+            self.data_file = '../../../data/SQuAD_validation.pkl'
+            self.prompt_data_file = '../../../data/SQuAD_train.pkl'
+            self.data = pickle.load(open(self.data_file, "rb"))
+            self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
+        if self.dataset == 'WikiQA':
+            self.data_file = '../../../data/WikiQA_train.pkl'
+            self.prompt_data_file = '../../../data/WikiQA_test.pkl'
             self.data = pickle.load(open(self.data_file, "rb"))
             self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
 
@@ -53,11 +58,6 @@ class Sampler(object):
         exp["id"] = index
         exp['answer'] = example['answers'] if self.dataset == 'webquestions' else example['answer']
         prompt = ""
-        if self.dataset == 'mmlu':
-            prompt += "Question: " + example["question"] + "\nChoices:\n"
-            for k, v in example["choices"].items():
-                prompt += k + ". " + str(v) + "\n"
-            prompt += " Answer: "
         if self.dataset == 'trivia_qa':
             PROMPT = "Answer these questions.\n"
             for i in range(k_shot):
@@ -83,6 +83,20 @@ class Sampler(object):
                 PROMPT += 'Context: ' + context + '\nQuestion: ' + self.prompt_data[i]['question'] + '\nAnswer: ' + answer + '\n'
                 i += 1
             prompt += PROMPT + 'Context: ' + example['context'] + '\nQuestion: ' + example['question'] + '\nAnswer: '
+        if self.dataset == 'WikiQA':
+            question = []
+            PROMPT = "Answer these questions.\n"
+            i = 0
+            while len(question) <= k_shot:
+                if self.prompt_data[i]['question'] in question:
+                    i += 1
+                    continue
+                question.append(self.prompt_data[i]['question'])
+                context = self.prompt_data[i]['context']
+                answer = self.prompt_data[i]['answer']
+                PROMPT += 'Context: ' + context + '\nQuestion: ' + self.prompt_data[i]['question'] + '\nAnswer: ' + answer + '\n'
+                i += 1
+            prompt += PROMPT + 'Context: ' + example['context'] + '\nQuestion: ' + example['question'] + '\nAnswer: '
         exp["prompt"] = prompt
         return exp
 
@@ -99,6 +113,16 @@ class Sampler(object):
         model_name = 'llama3/'
         if self.model._model_name == 'mistralai/Mistral-7B-v0.1':
             model_name = 'mistral/'
+        if self.model._model_name == 'tiiuae/falcon-7b':
+            model_name = 'falcon/'
+        if self.model._model_name == 'mosaicml/mpt-7b':
+            model_name = 'mpt/'
+        if self.model._model_name == '01-ai/Yi-6B':
+            model_name = 'Yi/'
+        if self.model._model_name == 'google/gemma-2-9b-it':
+            model_name = 'gemma/'
+        if self.model._model_name == 'meta-llama/Llama-2-7b-hf':
+            model_name = 'llama2/'
         if not os.path.exists(f'{stored_path}{model_name}{self.dataset}/'):
             os.makedirs(f'{stored_path}{model_name}{self.dataset}/', exist_ok=True)
         stored_path = f'{stored_path}{model_name}{self.dataset}/{self.dataset}_{start}_{end}_{num_responses}.pkl'
@@ -116,7 +140,7 @@ class Sampler(object):
             exp = self.format_prompt(self.data[i], index=i, k_shot=k_shot)
             answer = exp['answer'][0] if self.dataset == 'webquestions' else exp['answer']
             answers = exp['answer'] if self.dataset == 'webquestions' else [exp['answer']]
-            max_tokens = 4 if len(self.model._tokenizer(' ' + answer, add_special_tokens=False)) < 4 else len(self.model._tokenizer(' ' + exp['answer'], add_special_tokens=False))
+            max_tokens = 100
             exp['responses'] = self.model.generate_response(exp['prompt'], answer, num_responses, max_new_tokens=max_tokens)
             exp['exist_answer'] = False
             exp['candidates_logit'] = dict()
@@ -133,8 +157,11 @@ class Sampler(object):
                             responses[key] += val
                             exp['candidates_logit'][key] = 1
                 exp['responses'] = responses
-            if self.dataset == 'trivia_qa' or self.dataset == 'SQuAD':
+            if self.dataset == 'trivia_qa' or self.dataset == 'SQuAD' or self.dataset == 'WikiQA':
                 for key in exp['responses'].keys():  # PARTIAL MATCH RULES
+                    if key == '':
+                        continue
+                    key = key.split('\n')[0]
                     if answer in key:
                         exp['exist_answer'] = True
                         if answer not in exp['candidates_logit']:

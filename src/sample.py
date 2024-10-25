@@ -141,6 +141,8 @@ class Sampler(object):
             answer = exp['answer'][0] if self.dataset == 'webquestions' else exp['answer']
             answers = exp['answer'] if self.dataset == 'webquestions' else [exp['answer']]
             max_tokens = 4 if len(self.model._tokenizer(' ' + answer, add_special_tokens=False)) < 4 else len(self.model._tokenizer(' ' + exp['answer'], add_special_tokens=False))
+            if self.dataset == 'WikiQA':
+                max_tokens = 100
             exp['responses'] = self.model.generate_response(exp['prompt'], answer, num_responses, max_new_tokens=max_tokens)
             exp['exist_answer'] = False
             exp['candidates_logit'] = dict()

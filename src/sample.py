@@ -14,8 +14,7 @@ _VALID_LM_NAMES = {
     'mosaicml/mpt-7b': 'mpt',
     '01-ai/Yi-6B': 'yi',
     'meta-llama/Meta-Llama-3-8B': 'llama3',
-    "google/gemma-2-9b-it": "gemma",
-    "meta-llama/Llama-2-7b-hf": "llama2"
+    'meta-llama/Llama-2-7b-hf': 'llama2'
 }
 
 
@@ -45,8 +44,13 @@ class Sampler(object):
             self.data = pickle.load(open(self.data_file, "rb"))
             self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
         if self.dataset == 'SQuAD':
-            self.data_file = '../../../data/SQuAD_train.pkl'
-            self.prompt_data_file = '../../../data/SQuAD_validation.pkl'
+            self.data_file = '../../../data/SQuAD_validation.pkl'
+            self.prompt_data_file = '../../../data/SQuAD_train.pkl'
+            self.data = pickle.load(open(self.data_file, "rb"))
+            self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
+        if self.dataset == 'WikiQA':
+            self.data_file = '../../../data/WikiQA_train.pkl'
+            self.prompt_data_file = '../../../data/WikiQA_test.pkl'
             self.data = pickle.load(open(self.data_file, "rb"))
             self.prompt_data = pickle.load(open(self.prompt_data_file, "rb"))
 
@@ -65,11 +69,6 @@ class Sampler(object):
         exp["id"] = index
         exp['answer'] = example['answers'] if self.dataset == 'webquestions' else example['answer']
         prompt = ""
-        if self.dataset == 'mmlu':
-            prompt += "Question: " + example["question"] + "\nChoices:\n"
-            for k, v in example["choices"].items():
-                prompt += k + ". " + str(v) + "\n"
-            prompt += " Answer: "
         if self.dataset == 'trivia_qa':
             PROMPT = "Answer these questions.\n"
             for i in range(k_shot):
@@ -90,6 +89,20 @@ class Sampler(object):
                     i += 1
                     continue
                 title.append(self.prompt_data[i]['title'])
+                context = self.prompt_data[i]['context']
+                answer = self.prompt_data[i]['answer']
+                PROMPT += 'Context: ' + context + '\nQuestion: ' + self.prompt_data[i]['question'] + '\nAnswer: ' + answer + '\n'
+                i += 1
+            prompt += PROMPT + 'Context: ' + example['context'] + '\nQuestion: ' + example['question'] + '\nAnswer: '
+        if self.dataset == 'WikiQA':
+            question = []
+            PROMPT = "Answer these questions.\n"
+            i = 0
+            while len(question) <= k_shot:
+                if self.prompt_data[i]['question'] in question:
+                    i += 1
+                    continue
+                question.append(self.prompt_data[i]['question'])
                 context = self.prompt_data[i]['context']
                 answer = self.prompt_data[i]['answer']
                 PROMPT += 'Context: ' + context + '\nQuestion: ' + self.prompt_data[i]['question'] + '\nAnswer: ' + answer + '\n'
@@ -144,8 +157,11 @@ class Sampler(object):
                             responses[key] += val
                             exp['candidates_logit'][key] = 1
                 exp['responses'] = responses
-            if self.dataset == 'trivia_qa' or self.dataset == 'SQuAD':
+            if self.dataset == 'trivia_qa' or self.dataset == 'SQuAD' or self.dataset == 'WikiQA':
                 for key in exp['responses'].keys():  # PARTIAL MATCH RULES
+                    if key == '':
+                        continue
+                    key = key.split('\n')[0]
                     if answer in key:
                         exp['exist_answer'] = True
                         if answer not in exp['candidates_logit']:
